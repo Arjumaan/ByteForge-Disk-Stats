@@ -22,14 +22,18 @@ app.use('/api/system', require('./routes/taskmanager.routes'));
 app.use('/api/network', require('./routes/network.routes'));
 app.use('/api/health', require('./routes/health.routes'));
 
-// Build path
-const clientBuildPath = path.resolve(__dirname, '..', 'client', 'dist');
+// Build path - handle both development and Electron packaging
+const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+
+console.log('Looking for client build at:', clientBuildPath);
 
 if (fs.existsSync(clientBuildPath)) {
-    console.log("Serving static from " + clientBuildPath);
+    console.log("✅ Serving static from " + clientBuildPath);
     app.use(express.static(clientBuildPath));
 } else {
-    console.warn("Build not found");
+    console.error("❌ Build not found at:", clientBuildPath);
+    console.log("Current directory:", __dirname);
+    console.log("Files in parent:", fs.readdirSync(path.join(__dirname, '..')));
 }
 
 // Handle SPA routing
@@ -38,23 +42,14 @@ app.get(/.*/, (req, res) => {
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        // Serve a friendly waiting page instead of a hard error during builds
-        res.type('html').send(`
-            <!DOCTYPE html>
+        res.status(404).send(`
             <html>
-            <head>
-                <title>ByteForge - Updating</title>
-                <meta http-equiv="refresh" content="2">
-                <style>body{font-family:system-ui,sans-serif;display:flex;height:100vh;justify-content:center;align-items:center;background:#f8fafc;color:#334155}</style>
-            </head>
-            <body>
-                <div style="text-align:center">
-                    <h1 style="margin-bottom:10px">System Updating...</h1>
-                    <p>The dashboard is rebuilding. Please wait...</p>
-                    <div style="margin-top:20px;display:inline-block;width:20px;height:20px;border:3px solid #cbd5e1;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite"></div>
-                    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-                </div>
-            </body>
+                <body style="background:#1a1a1a;color:#fff;font-family:Arial;padding:50px;text-align:center;">
+                    <h1>❌ Frontend Not Found</h1>
+                    <p>Build path: ${clientBuildPath}</p>
+                    <p>Index path: ${indexPath}</p>
+                    <p>Please rebuild the client: <code>cd client && npm run build</code></p>
+                </body>
             </html>
         `);
     }
