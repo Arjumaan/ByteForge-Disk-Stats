@@ -9,6 +9,8 @@ yarn.lock
 # Production build
 client/dist/
 client/build/
+dist-electron/
+build/
 
 # Environment variables
 .env
@@ -46,3 +48,4 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+convert-icon.js
