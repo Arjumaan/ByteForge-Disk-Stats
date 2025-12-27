@@ -5,6 +5,16 @@ A comprehensive Windows system monitoring and optimization tool built with React
 ![ByteForge Stats Board](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
+[![GitHub release](https://img.shields.io/github/v/release/Arjumaan/ByteForge-Disk-Stats)](https://github.com/Arjumaan/ByteForge-Disk-Stats/releases)
+[![Downloads](https://img.shields.io/github/downloads/Arjumaan/ByteForge-Disk-Stats/total)](https://github.com/Arjumaan/ByteForge-Disk-Stats/releases)
+
+## 📥 Download
+
+**Latest Release:** [Download ByteForge Stats Board v1.0.0](https://github.com/Arjumaan/ByteForge-Disk-Stats/releases/latest)
+
+Choose your version:
+- **Installer:** Full setup with shortcuts
+- **Portable:** No installation required
 
 ## 🚀 Features
 
