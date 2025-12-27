@@ -1,0 +1,14 @@
+{
+    "name": "byteforge-stats-board",
+    "version": "1.0.0",
+    "description": "System-Level Disk Intelligence Platform",
+    "main": "electron-main.js",
+    "scripts": {
+        "start": "node server/server.js",
+        "electron": "electron .",
+        "dist": "electron-builder"
+    },
+    "devDependencies": {
+        "electron": "^39.2.7"
+    }
+}
