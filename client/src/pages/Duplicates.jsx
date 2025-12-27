@@ -1,4 +1,4 @@
-import { Card, Title, Text, Badge, ProgressBar } from '@tremor/react';
+import { Card, Title, Text, Badge, ProgressBar, Accordion, AccordionHeader, AccordionBody } from '@tremor/react';
 import { Copy, Trash2, AlertTriangle, ScanLine, FolderSearch, HardDrive } from 'lucide-react';
 import { api } from '../lib/api';
 import { useState } from 'react';
@@ -15,46 +15,50 @@ function formatBytes(bytes, decimals = 2) {
 export default function Duplicates() {
     const [scanning, setScanning] = useState(false);
     const [status, setStatus] = useState('');
-    const [duplicates, setDuplicates] = useState(null);
+    const [duplicatesByDrive, setDuplicatesByDrive] = useState({}); // { 'C:': [...], 'D:': [...] }
     const [error, setError] = useState('');
     const [currentDrive, setCurrentDrive] = useState('');
 
     const startScan = async () => {
         setScanning(true);
-        setStatus("Initializing full disk scan...");
+        setStatus("Detecting available drives...");
         setError('');
-        setDuplicates(null);
+        setDuplicatesByDrive({});
 
         try {
-            let allDuplicates = [];
+            // Scan all available drives (A-Z)
+            const drives = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+            const results = {};
 
-            // Scan C: Drive
-            setCurrentDrive('C:');
-            setStatus("Scanning C: drive for files >= 1MB (this will take several minutes)...");
-            const cData = await api.findDuplicates("C:\\\\");
-            allDuplicates = [...cData];
+            for (const drive of drives) {
+                const drivePath = `${drive}:\\\\`;
+                setCurrentDrive(`${drive}:`);
+                setStatus(`Scanning ${drive}: drive for files >= 1MB...`);
 
-            // Scan D: Drive if it exists
-            try {
-                setCurrentDrive('D:');
-                setStatus("Scanning D: drive for files >= 1MB...");
-                const dData = await api.findDuplicates("D:\\\\");
-                allDuplicates = [...allDuplicates, ...dData];
-            } catch (e) {
-                console.log("D: drive not accessible or doesn't exist");
+                try {
+                    const data = await api.findDuplicates(drivePath);
+                    if (data && data.length > 0) {
+                        results[`${drive}:`] = data;
+                    }
+                } catch (e) {
+                    // Drive doesn't exist or not accessible, skip it
+                    console.log(`${drive}: drive not accessible or doesn't exist`);
+                }
             }
 
-            setDuplicates(allDuplicates);
+            setDuplicatesByDrive(results);
             setStatus("");
             setCurrentDrive('');
 
-            if (allDuplicates.length === 0) {
-                setStatus("Scan complete! No duplicates found on C: and D: drives.");
+            const totalDrives = Object.keys(results).length;
+            if (totalDrives === 0) {
+                setStatus("Scan complete! No duplicates found on any drive.");
             } else {
-                const totalWasted = allDuplicates.reduce((sum, group) =>
-                    sum + (group.size * (group.files.length - 1)), 0
+                const totalDuplicates = Object.values(results).reduce((sum, arr) => sum + arr.length, 0);
+                const totalWasted = Object.values(results).reduce((sum, driveData) =>
+                    sum + driveData.reduce((s, group) => s + (group.size * (group.files.length - 1)), 0), 0
                 );
-                setStatus(`Found ${allDuplicates.length} duplicate groups wasting ${formatBytes(totalWasted)}`);
+                setStatus(`Found duplicates on ${totalDrives} drive(s) - ${totalDuplicates} groups wasting ${formatBytes(totalWasted)}`);
             }
         } catch (e) {
             console.error(e);
@@ -77,29 +81,29 @@ export default function Duplicates() {
         }
     };
 
-    const deleteAllDuplicates = async () => {
-        if (!duplicates || duplicates.length === 0) return;
+    const deleteAllDuplicatesForDrive = async (drive) => {
+        const driveData = duplicatesByDrive[drive];
+        if (!driveData || driveData.length === 0) return;
 
-        const totalFiles = duplicates.reduce((sum, group) => sum + (group.files.length - 1), 0);
-        const totalSpace = duplicates.reduce((sum, group) => sum + (group.size * (group.files.length - 1)), 0);
+        const totalFiles = driveData.reduce((sum, group) => sum + (group.files.length - 1), 0);
+        const totalSpace = driveData.reduce((sum, group) => sum + (group.size * (group.files.length - 1)), 0);
 
         if (window.confirm(
-            `⚠️ DELETE ALL DUPLICATES?\n\n` +
+            `⚠️ DELETE ALL DUPLICATES ON ${drive}?\n\n` +
             `This will delete ${totalFiles} duplicate files and free up ${formatBytes(totalSpace)}.\n\n` +
             `The first copy of each file will be kept.\n\n` +
             `This action CANNOT be undone!\n\nAre you absolutely sure?`
         )) {
-            if (window.confirm(`🚨 FINAL WARNING!\n\nYou are about to permanently delete ${totalFiles} files!\n\nClick OK to proceed.`)) {
+            if (window.confirm(`🚨 FINAL WARNING!\n\nYou are about to permanently delete ${totalFiles} files from ${drive}!\n\nClick OK to proceed.`)) {
                 try {
-                    // Collect all duplicate files (skip first in each group)
                     const filesToDelete = [];
-                    duplicates.forEach(group => {
+                    driveData.forEach(group => {
                         group.files.slice(1).forEach(file => filesToDelete.push(file));
                     });
 
                     // TODO: Implement bulk delete endpoint
-                    alert(`Would delete ${filesToDelete.length} files. Backend implementation needed.`);
-                    console.log("Files to delete:", filesToDelete);
+                    alert(`Would delete ${filesToDelete.length} files from ${drive}. Backend implementation needed.`);
+                    console.log(`Files to delete from ${drive}:`, filesToDelete);
                 } catch (e) {
                     alert("Failed to delete duplicates: " + e.message);
                 }
@@ -112,35 +116,24 @@ export default function Duplicates() {
             <div className="flex justify-between items-end">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">Duplicate Finder</h2>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Complete scan of C: and D: drives for files ≥ 1MB</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Complete scan of all available drives for files ≥ 1MB</p>
                 </div>
-                <div className="flex gap-3">
-                    {duplicates && duplicates.length > 0 && (
-                        <button
-                            onClick={deleteAllDuplicates}
-                            className="px-6 py-3 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-                        >
-                            <Trash2 size={20} />
-                            Delete All Duplicates
-                        </button>
-                    )}
-                    <button
-                        onClick={startScan}
-                        disabled={scanning}
-                        className={`
-                            px-6 py-3 rounded-lg font-semibold text-white
-                            flex items-center gap-2 transition-all
-                            ${scanning
-                                ? 'bg-violet-400 cursor-not-allowed'
-                                : 'bg-violet-600 hover:bg-violet-700 active:bg-violet-800'
-                            }
-                            shadow-md hover:shadow-lg
-                        `}
-                    >
-                        <ScanLine size={20} className={scanning ? 'animate-spin' : ''} />
-                        {scanning ? 'Scanning...' : 'Scan Both Drives'}
-                    </button>
-                </div>
+                <button
+                    onClick={startScan}
+                    disabled={scanning}
+                    className={`
+                        px-6 py-3 rounded-lg font-semibold text-white
+                        flex items-center gap-2 transition-all
+                        ${scanning
+                            ? 'bg-violet-400 cursor-not-allowed'
+                            : 'bg-violet-600 hover:bg-violet-700 active:bg-violet-800'
+                        }
+                        shadow-md hover:shadow-lg
+                    `}
+                >
+                    <ScanLine size={20} className={scanning ? 'animate-spin' : ''} />
+                    {scanning ? 'Scanning...' : 'Scan All Drives'}
+                </button>
             </div>
 
             {/* Status Messages */}
@@ -171,7 +164,7 @@ export default function Duplicates() {
             )}
 
             {/* Initial State */}
-            {!duplicates && !scanning && !error && (
+            {Object.keys(duplicatesByDrive).length === 0 && !scanning && !error && (
                 <Card className="text-center py-16 bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20">
                     <div className="flex flex-col items-center gap-4">
                         <div className="p-6 bg-violet-100 dark:bg-violet-900/40 rounded-full">
@@ -180,25 +173,25 @@ export default function Duplicates() {
                         <div>
                             <Title className="text-2xl mb-2">Complete Duplicate File Scanner</Title>
                             <Text className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                                Scans BOTH C: and D: drives completely for all files ≥ 1MB.
-                                This is a thorough scan that may take 10-30 minutes depending on disk size.
+                                Scans ALL available drives (C:, D:, E:, etc.) for files ≥ 1MB.
+                                Results are organized by drive for easy management.
                             </Text>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 max-w-2xl">
                             <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                                 <HardDrive className="text-violet-500 mb-2" size={24} />
-                                <Text className="font-medium">Complete Scan</Text>
-                                <Text className="text-xs text-slate-500 mt-1">Scans C: and D: drives entirely</Text>
+                                <Text className="font-medium">All Drives</Text>
+                                <Text className="text-xs text-slate-500 mt-1">Auto-detects all available drives</Text>
                             </div>
                             <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                                 <ScanLine className="text-violet-500 mb-2" size={24} />
-                                <Text className="font-medium">Files ≥ 1MB</Text>
-                                <Text className="text-xs text-slate-500 mt-1">Finds all large duplicate files</Text>
+                                <Text className="font-medium">Organized Results</Text>
+                                <Text className="text-xs text-slate-500 mt-1">Duplicates grouped by drive</Text>
                             </div>
                             <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                                 <Trash2 className="text-violet-500 mb-2" size={24} />
-                                <Text className="font-medium">Bulk Delete</Text>
-                                <Text className="text-xs text-slate-500 mt-1">Delete all duplicates at once</Text>
+                                <Text className="font-medium">Per-Drive Delete</Text>
+                                <Text className="text-xs text-slate-500 mt-1">Delete duplicates drive by drive</Text>
                             </div>
                         </div>
                     </div>
@@ -206,80 +199,121 @@ export default function Duplicates() {
             )}
 
             {/* No Duplicates Found */}
-            {duplicates && duplicates.length === 0 && (
+            {Object.keys(duplicatesByDrive).length === 0 && !scanning && status && (
                 <Card className="text-center py-12 bg-emerald-50 dark:bg-emerald-900/20">
                     <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-emerald-100 dark:bg-emerald-900/40 rounded-full">
                             <Copy size={32} className="text-emerald-600" />
                         </div>
                         <Title className="text-emerald-700 dark:text-emerald-300">No Duplicates Found!</Title>
-                        <Text className="text-slate-600 dark:text-slate-400">Your drives are clean and optimized.</Text>
+                        <Text className="text-slate-600 dark:text-slate-400">All your drives are clean and optimized.</Text>
                     </div>
                 </Card>
             )}
 
-            {/* Duplicate Groups */}
-            {duplicates && duplicates.length > 0 && (
-                <div className="space-y-4">
-                    {duplicates.map((group, idx) => (
-                        <Card key={idx} decoration="left" decorationColor="red">
-                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Badge color="red" size="sm">Duplicate Group #{idx + 1}</Badge>
-                                        <Badge color="slate" size="sm">{group.files.length} copies</Badge>
-                                    </div>
-                                    <Text className="font-mono text-xs text-slate-400">Hash: {group.hash.substring(0, 16)}...</Text>
-                                </div>
-                                <div className="text-right">
-                                    <Text className="text-lg font-bold text-slate-700 dark:text-slate-200">{formatBytes(group.size)}</Text>
-                                    <Text className="text-xs text-slate-500">per file</Text>
-                                </div>
-                            </div>
+            {/* Duplicates by Drive */}
+            {Object.keys(duplicatesByDrive).length > 0 && (
+                <div className="space-y-6">
+                    {Object.entries(duplicatesByDrive).map(([drive, duplicates]) => {
+                        const totalWasted = duplicates.reduce((sum, group) => sum + (group.size * (group.files.length - 1)), 0);
+                        const totalFiles = duplicates.reduce((sum, group) => sum + (group.files.length - 1), 0);
 
-                            <div className="space-y-2">
-                                {group.files.map((file, fIdx) => (
-                                    <div
-                                        key={fIdx}
-                                        className={`flex justify-between items-center p-3 rounded-lg transition-all ${fIdx === 0
-                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
-                                                : 'bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            {fIdx === 0 && (
-                                                <Badge color="emerald" size="xs">Keep</Badge>
-                                            )}
-                                            <span className="font-mono text-sm text-slate-600 dark:text-slate-300 truncate">
-                                                {file}
-                                            </span>
+                        return (
+                            <Card key={drive} decoration="top" decorationColor="violet" className="overflow-hidden">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-violet-100 dark:bg-violet-900/40 rounded-lg">
+                                            <HardDrive className="text-violet-600 dark:text-violet-400" size={28} />
                                         </div>
-                                        {fIdx > 0 && (
-                                            <button
-                                                onClick={() => deleteDuplicate(file)}
-                                                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md flex items-center gap-1.5 transition-colors shadow-sm"
-                                            >
-                                                <Trash2 size={14} />
-                                                Delete
-                                            </button>
-                                        )}
+                                        <div>
+                                            <Title className="text-xl">Drive {drive}</Title>
+                                            <div className="flex gap-2 mt-1">
+                                                <Badge color="red" size="sm">{duplicates.length} duplicate groups</Badge>
+                                                <Badge color="orange" size="sm">{totalFiles} files to delete</Badge>
+                                                <Badge color="slate" size="sm">{formatBytes(totalWasted)} wasted</Badge>
+                                            </div>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-
-                            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                                <Text className="text-sm text-slate-600 dark:text-slate-400">
-                                    Wasted space in this group:
-                                </Text>
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle size={16} className="text-orange-500" />
-                                    <Text className="text-lg font-bold text-orange-600 dark:text-orange-400">
-                                        {formatBytes(group.size * (group.files.length - 1))}
-                                    </Text>
+                                    <button
+                                        onClick={() => deleteAllDuplicatesForDrive(drive)}
+                                        className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors shadow-md"
+                                    >
+                                        <Trash2 size={18} />
+                                        Delete All on {drive}
+                                    </button>
                                 </div>
-                            </div>
-                        </Card>
-                    ))}
+
+                                <Accordion className="mt-4">
+                                    <AccordionHeader>
+                                        <Text className="font-medium">Show {duplicates.length} duplicate groups</Text>
+                                    </AccordionHeader>
+                                    <AccordionBody>
+                                        <div className="space-y-4 mt-4">
+                                            {duplicates.map((group, idx) => (
+                                                <Card key={idx} decoration="left" decorationColor="red" className="bg-slate-50 dark:bg-slate-800/50">
+                                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200 dark:border-slate-700">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <Badge color="red" size="xs">Group #{idx + 1}</Badge>
+                                                                <Badge color="slate" size="xs">{group.files.length} copies</Badge>
+                                                            </div>
+                                                            <Text className="font-mono text-xs text-slate-400">Hash: {group.hash.substring(0, 16)}...</Text>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <Text className="text-base font-bold text-slate-700 dark:text-slate-200">{formatBytes(group.size)}</Text>
+                                                            <Text className="text-xs text-slate-500">per file</Text>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        {group.files.map((file, fIdx) => (
+                                                            <div
+                                                                key={fIdx}
+                                                                className={`flex justify-between items-center p-2.5 rounded-lg transition-all ${fIdx === 0
+                                                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
+                                                                        : 'bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                                                    }`}
+                                                            >
+                                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                    {fIdx === 0 && (
+                                                                        <Badge color="emerald" size="xs">Keep</Badge>
+                                                                    )}
+                                                                    <span className="font-mono text-xs text-slate-600 dark:text-slate-300 truncate">
+                                                                        {file}
+                                                                    </span>
+                                                                </div>
+                                                                {fIdx > 0 && (
+                                                                    <button
+                                                                        onClick={() => deleteDuplicate(file)}
+                                                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded flex items-center gap-1 transition-colors"
+                                                                    >
+                                                                        <Trash2 size={12} />
+                                                                        Delete
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                                        <Text className="text-xs text-slate-600 dark:text-slate-400">
+                                                            Wasted space in this group:
+                                                        </Text>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <AlertTriangle size={14} className="text-orange-500" />
+                                                            <Text className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                                                                {formatBytes(group.size * (group.files.length - 1))}
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </AccordionBody>
+                                </Accordion>
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
         </div>

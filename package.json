@@ -1,14 +1,61 @@
 {
     "name": "byteforge-stats-board",
     "version": "1.0.0",
-    "description": "System-Level Disk Intelligence Platform",
+    "description": "Complete Windows system monitoring and optimization tool",
+    "author": "Arjumaan.M",
     "main": "electron-main.js",
     "scripts": {
         "start": "node server/server.js",
         "electron": "electron .",
-        "dist": "electron-builder"
+        "build": "cd client && npm run build",
+        "pack": "electron-builder --dir",
+        "dist": "npm run build && electron-builder",
+        "dist:win": "npm run build && electron-builder --win --x64"
+    },
+    "build": {
+        "appId": "com.byteforge.statsboard",
+        "productName": "ByteForge Stats Board",
+        "copyright": "Copyright © 2025 All Rights Reserved",
+        "directories": {
+            "output": "dist-electron"
+        },
+        "files": [
+            "electron-main.js",
+            "server/**/*",
+            "client/dist/**/*",
+            "package.json"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "build/icon.ico",
+            "requestedExecutionLevel": "requireAdministrator"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "ByteForge Stats Board"
+        },
+        "portable": {
+            "artifactName": "ByteForge-Portable-${version}.exe"
+        }
     },
     "devDependencies": {
-        "electron": "^39.2.7"
+        "electron": "^28.3.3",
+        "electron-builder": "^24.13.3"
     }
 }
