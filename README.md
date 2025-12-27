@@ -3,8 +3,8 @@
 A comprehensive Windows system monitoring and optimization tool built with React and Node.js. Monitor hardware health, manage applications, clean junk files, and optimize your system performance - all from a beautiful, modern dashboard.
 
 ![ByteForge Stats Board](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+![Status](https://img.shields.io/badge/status-active-success.svg)
 
 ## 🚀 Features
 
@@ -197,21 +197,13 @@ Change the port in `server/app.js`:
 const PORT = process.env.PORT || 3002;
 ```
 
-## 📝 License
+## 📝 Copyright & Usage
 
-MIT License - feel free to use this project for personal or commercial purposes.
+**© 2025 All Rights Reserved**
 
-## 🤝 Contributing
+This software is proprietary and confidential. Unauthorized copying, distribution, modification, or use of this software, via any medium, is strictly prohibited without explicit written permission from the owner.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 🙏 Acknowledgments
+## 🐛 Troubleshooting
 
 - [systeminformation](https://github.com/sebhildebrandt/systeminformation) - System information library
 - [Tremor](https://www.tremor.so/) - React UI components
